@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Star Catcher</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 20px;
+      color: #eef8ff; font-family: system-ui, sans-serif;
+      background:
+        radial-gradient(circle at 18px 28px, #e0f6ff 1px, transparent 1.8px) 0 0 / 113px 127px,
+        radial-gradient(circle at 67px 83px, #72baff 1px, transparent 2px) 0 0 / 179px 163px,
+        radial-gradient(circle at 41px 52px, #ffffff99 1.5px, transparent 2.5px) 0 0 / 251px 211px,
+        radial-gradient(ellipse at 15% 20%, #17478c88, transparent 50%),
+        radial-gradient(ellipse at 85% 80%, #087f9b55, transparent 45%),
+        linear-gradient(145deg, #020719, #0b204b 55%, #030b20);
+    }
+    main { width: min(100%, 640px); }
+    header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; }
+    h1 { margin: 0; font-size: clamp(24px, 5vw, 36px); color: #d5f3ff; text-shadow: 0 0 24px #399fff99; }
+    .stats { display: flex; gap: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .stats > div { padding: 8px 12px; border: 1px solid #4088bc88; border-radius: 12px; background: #081c3de6; }
+    .stats b { color: #81ddff; }
+    .stats span { display: block; color: #a6cbed; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+    .arena { position: relative; overflow: hidden; border: 1px solid #5bbcff99; border-radius: 20px; box-shadow: 0 20px 70px #0008, 0 0 35px #178dff33, inset 0 0 25px #388eff22; }
+    canvas {
+      display: block; width: 100%; aspect-ratio: 640 / 560;
+      background:
+        radial-gradient(ellipse at 80% 15%, #2277aa66, transparent 42%),
+        radial-gradient(ellipse at 20% 65%, #264fc066, transparent 50%),
+        linear-gradient(165deg, #06132e, #102b59 60%, #07172f);
+    }
+    .overlay {
+      position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: 24px;
+      background:
+        radial-gradient(circle at 20% 19%, #d7f5ff 1.5px, transparent 3px),
+        radial-gradient(circle at 78% 24%, #95dfff 2px, transparent 4px),
+        radial-gradient(circle at 86% 68%, #d7f5ff 1px, transparent 3px),
+        radial-gradient(circle at 14% 76%, #95dfff 2px, transparent 4px),
+        radial-gradient(ellipse at 50% 100%, #176096cc, transparent 65%),
+        linear-gradient(155deg, #06132eee, #102c57ee);
+    }
+    .overlay[hidden] { display: none; }
+    h2 { font-size: clamp(28px, 6vw, 44px); margin: 0 0 8px; color: #e1f7ff; text-shadow: 0 0 30px #65bbff88; }
+    p { line-height: 1.6; color: #bad9f4; }
+    button { border: 1px solid #9beaff; border-radius: 12px; padding: 14px 24px; font: inherit; font-weight: 750; cursor: pointer; background: linear-gradient(135deg, #b5efff, #63baff); color: #061a38; touch-action: none; box-shadow: 0 0 24px #369fff44; }
+    button:hover { background: linear-gradient(135deg, #dcfaff, #8ed6ff); box-shadow: 0 0 30px #369fff77; }
+    button:focus-visible { outline: 3px solid #c5f5ff; outline-offset: 4px; }
+    footer { text-align: center; }
+    .controls { display: flex; justify-content: center; gap: 16px; }
+    .controls button { min-width: 90px; background: linear-gradient(145deg, #19477b, #0b254d); color: #d7f5ff; border-color: #498ac4; user-select: none; }
+    .controls button:hover { background: linear-gradient(145deg, #24649e, #163969); }
+    .controls button:active { background: #24649e; }
+    .hint { font-size: 14px; margin: 14px 0; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>✦ Star Catcher</h1>
+      <div class="stats"><div><span>Caught</span><b id="caught">0</b> / 10</div><div><span>Missed</span><b id="missed">0</b> / 3</div></div>
+    </header>
+    <div class="arena">
+      <canvas id="game" width="640" height="560" aria-label="Stars fall toward a basket. Move with the left and right arrow keys.">Use a browser that supports canvas to play Star Catcher.</canvas>
+      <div class="overlay" id="overlay">
+        <h2 id="title">A sky full of stars.</h2>
+        <p id="message">Catch 10 stars to win.<br>Miss 3 and it's game over.</p>
+        <button id="start">Let's play</button>
+      </div>
+    </div>
+    <footer>
+      <p class="hint">Move with ← → arrow keys, or hold the buttons below.</p>
+      <div class="controls"><button id="left" aria-label="Move basket left">←</button><button id="right" aria-label="Move basket right">→</button></div>
+    </footer>
+    <p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
+  </main>
+  <script>
+    'use strict';
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const overlay = document.getElementById('overlay');
+    const start = document.getElementById('start');
+    const caughtLabel = document.getElementById('caught');
+    const missedLabel = document.getElementById('missed');
+    const announcement = document.getElementById('announcement');
+    const W = 640, H = 560;
+    const basket = { x: 270, y: 490, width: 100, height: 42 };
+    const keys = new Set();
+    const touches = new Map();
+    let stars = [], caught = 0, missed = 0, running = false;
+    let spawnTimer = 0, lastTime = 0;
+
+    function clearInput() { keys.clear(); touches.clear(); }
+    window.addEventListener('keydown', event => {
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        event.preventDefault();
+        keys.add(event.key);
+      }
+    });
+    window.addEventListener('keyup', event => keys.delete(event.key));
+    window.addEventListener('blur', clearInput);
+    document.addEventListener('visibilitychange', () => { clearInput(); lastTime = 0; });
+    for (const [id, direction] of [['left', -1], ['right', 1]]) {
+      const button = document.getElementById(id);
+      button.addEventListener('pointerdown', event => {
+        button.setPointerCapture(event.pointerId);
+        touches.set(event.pointerId, direction);
+      });
+      for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+        button.addEventListener(type, event => touches.delete(event.pointerId));
+      }
+    }
+
+    function endGame(won) {
+      running = false;
+      clearInput();
+      document.getElementById('title').textContent = won ? 'You caught the stars!' : 'The stars slipped away.';
+      const message = won ? '10 stars caught. You win!' : '3 stars missed. Give it another try!';
+      document.getElementById('message').textContent = message;
+      announcement.textContent = message;
+      start.textContent = 'Play again';
+      overlay.hidden = false;
+      start.focus();
+    }
+
+    start.addEventListener('click', () => {
+      stars = []; caught = 0; missed = 0; spawnTimer = 0;
+      basket.x = (W - basket.width) / 2;
+      caughtLabel.textContent = '0'; missedLabel.textContent = '0';
+      clearInput(); lastTime = 0; running = true; overlay.hidden = true;
+      announcement.textContent = 'Game started. Catch 10 stars and miss fewer than 3.';
+    });
+
+    function update(dt) {
+      const left = keys.has('ArrowLeft') || [...touches.values()].includes(-1);
+      const right = keys.has('ArrowRight') || [...touches.values()].includes(1);
+      basket.x = Math.max(0, Math.min(W - basket.width, basket.x + (Number(right) - Number(left)) * 430 * dt));
+      spawnTimer -= dt;
+      if (spawnTimer <= 0) {
+        stars.push({ x: 24 + Math.random() * (W - 48), y: -20, radius: 14, speed: 155 + caught * 5, angle: Math.random() * Math.PI });
+        spawnTimer = 1.12;
+      }
+      for (let i = stars.length - 1; i >= 0; i--) {
+        const star = stars[i];
+        const previousBottom = star.y + star.radius;
+        star.y += star.speed * dt;
+        star.angle += dt;
+        if (previousBottom <= basket.y && star.y + star.radius >= basket.y && star.x + star.radius >= basket.x && star.x - star.radius <= basket.x + basket.width) {
+          stars.splice(i, 1);
+          caughtLabel.textContent = String(++caught);
+          if (caught === 10) { endGame(true); return; }
+        } else if (star.y - star.radius > H) {
+          stars.splice(i, 1);
+          missedLabel.textContent = String(++missed);
+          announcement.textContent = `${missed} of 3 stars missed.`;
+          if (missed === 3) { endGame(false); return; }
+        }
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      for (let i = 0; i < 55; i++) {
+        ctx.fillStyle = i % 3 ? '#ffffff35' : '#ffffff70';
+        ctx.beginPath(); ctx.arc((i * 137 + 19) % W, (i * 79 + 11) % (H - 70), i % 3 === 0 ? 1.6 : 1, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = '#1c294a'; ctx.fillRect(0, 540, W, 20);
+      for (const star of stars) {
+        ctx.save(); ctx.translate(star.x, star.y); ctx.rotate(star.angle);
+        ctx.fillStyle = '#ffe08a'; ctx.shadowColor = '#ffd05f'; ctx.shadowBlur = 15;
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+          const angle = i * Math.PI / 5 - Math.PI / 2;
+          const radius = i % 2 ? 6.5 : star.radius;
+          const x = Math.cos(angle) * radius, y = Math.sin(angle) * radius;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath(); ctx.fill(); ctx.restore();
+      }
+      const x = basket.x, y = basket.y;
+      ctx.fillStyle = '#c88648'; ctx.beginPath();
+      ctx.moveTo(x, y); ctx.lineTo(x + 100, y); ctx.lineTo(x + 88, y + 42); ctx.lineTo(x + 12, y + 42); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#f5c780'; ctx.lineWidth = 3;
+      for (let i = 1; i <= 4; i++) { ctx.beginPath(); ctx.moveTo(x + i * 20, y + 8); ctx.lineTo(x + 10 + i * 16, y + 37); ctx.stroke(); }
+      for (const offset of [16, 29]) { ctx.beginPath(); ctx.moveTo(x + 10, y + offset); ctx.lineTo(x + 90, y + offset); ctx.stroke(); }
+      ctx.fillStyle = '#ffe0a0'; ctx.fillRect(x - 3, y, 106, 8);
+      // Keep each caught star inside the basket as it moves.
+      for (let collected = 0; collected < caught; collected++) {
+        const starX = x + 18 + (collected % 5) * 16;
+        const starY = y + 32 - Math.floor(collected / 5) * 16;
+        ctx.save();
+        ctx.fillStyle = '#fff2a8';
+        ctx.shadowColor = '#ffd05f'; ctx.shadowBlur = 6;
+        ctx.beginPath();
+        for (let point = 0; point < 10; point++) {
+          const angle = point * Math.PI / 5 - Math.PI / 2;
+          const radius = point % 2 ? 3 : 7;
+          const px = starX + Math.cos(angle) * radius;
+          const py = starY + Math.sin(angle) * radius;
+          if (point === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath(); ctx.fill(); ctx.restore();
+      }
+    }
+
+    function frame(time) {
+      const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.04) : 0;
+      lastTime = time;
+      if (running && !document.hidden) update(dt);
+      draw();
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
