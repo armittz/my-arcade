@@ -1,0 +1,107 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pizza Express</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;background:#1c2630;color:#fff5df;font-family:system-ui,sans-serif}main{width:min(100%,660px)}header,.scores{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}h1{margin:0;font-size:32px}.scores{font-weight:700;font-size:15px}.order{background:#fff0d0;color:#412c23;padding:14px 18px;border-radius:14px;margin:16px 0;min-height:84px}.order strong{display:block;margin-bottom:8px}.ingredients{display:flex;gap:8px;flex-wrap:wrap}.ingredient{background:#e8d5b6;border-radius:8px;padding:5px 10px}.ingredient.done{background:#b6dfb2;text-decoration:line-through}.arena{position:relative;border:3px solid #829293;border-radius:16px;overflow:hidden}canvas{width:100%;display:block;aspect-ratio:640/520;background:#374649}.overlay{position:absolute;inset:0;display:grid;place-content:center;padding:24px;text-align:center;background:#19252af2}.overlay[hidden]{display:none}h2{font-size:36px;margin:0 0 10px}p{line-height:1.6}button{border:0;border-radius:12px;background:#ffcf6f;color:#382611;font:700 20px system-ui;padding:15px 26px;cursor:pointer;touch-action:none}button:hover{background:#ffe1a1}button:focus-visible{outline:3px solid #fff;outline-offset:3px}.controls{display:flex;justify-content:center;gap:20px}.controls button{min-width:100px}#status{min-height:26px;text-align:center;color:#ffe0a0;margin:12px 0}.hint{text-align:center;font-size:14px;color:#c7d7d9;margin:12px 0}
+.ingredient{display:inline-flex;align-items:center;gap:8px;background:#fff9e9;border:1px solid #d7bc90;border-radius:12px;padding:6px 12px;font-weight:600;box-shadow:0 2px 0 #cbb18b33}.ingredient canvas{width:34px;height:34px;aspect-ratio:1;background:transparent;flex:none}.ingredient.done{border-color:#72ae72}
+.menu-link { display: inline-block; margin-bottom: 16px; padding: 10px 16px; border: 1px solid #91b8d0; border-radius: 10px; color: #edf8ff; background: #182e46; font: 700 16px system-ui, sans-serif; text-decoration: none; }
+.menu-link:hover { background: #2a4d6c; }
+.menu-link:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+</style>
+</head>
+<body><main>
+  <a class="menu-link" href="index.html"> Menu</a>
+<header><h1>Pizza Express</h1><div class="scores"><span>Score <b id="score">0</b></span><span>Ruined <b id="ruined">0</b>/3</span><span>Best <b id="best">0</b></span></div></header>
+<div class="order"><strong>ORDER CARD · Catch one of each</strong><div id="ingredients" class="ingredients"></div></div>
+<div class="arena"><canvas id="game" width="640" height="520" aria-label="Pizza conveyor game. Move left and right to catch the toppings on your order card."></canvas>
+<div id="overlay" class="overlay"><h2 id="title">Special delivery!</h2><p id="message">Steer with ← and → to catch your order's toppings.<br>Dodge other toppings and any you already collected.<br>Finish pizzas for points. Ruin 3 and your shift ends.</p><button id="start">Start cooking</button></div></div>
+<p id="status" role="status" aria-live="polite">Your first order is coming up.</p>
+<div class="controls"><button id="left" aria-label="Move left">←</button><button id="right" aria-label="Move right">→</button></div>
+<p class="hint">Hold ← → or the buttons to steer. Missed toppings come around again.</p>
+</main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('2d');
+const types=[{name:'Pepperoni',color:'#ca4939',symbol:'P'},{name:'Mushroom',color:'#dac6a2',symbol:'M'},{name:'Basil',color:'#61bc75',symbol:'B'},{name:'Olive',color:'#403c57',symbol:'O'},{name:'Pineapple',color:'#ffe275',symbol:'A'}];
+const keys=new Set(),pointers=new Map();
+let score=0,ruined=0,best=0,running=false,pizza={x:320,y:420,r:43},items=[],order=[],collected=[],spawn=0,transition=0,last=0,belt=0;
+try{const saved=Number(localStorage.getItem('pizzaExpressBest'));if(Number.isSafeInteger(saved)&&saved>=0)best=saved;}catch{}
+$('best').textContent=best;
+function saveBest(){if(score>best){best=score;$('best').textContent=best;try{localStorage.setItem('pizzaExpressBest',String(best));}catch{}}}
+function clearInput(){keys.clear();pointers.clear();}
+window.addEventListener('blur',clearInput);
+document.addEventListener('visibilitychange',()=>{last=0;clearInput();});
+window.addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();keys.add(e.key);}});
+window.addEventListener('keyup',e=>keys.delete(e.key));
+for(const [id,dir] of [['left',-1],['right',1]]){const b=$(id);b.addEventListener('pointerdown',e=>{b.setPointerCapture(e.pointerId);pointers.set(e.pointerId,dir);});for(const event of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,e=>pointers.delete(e.pointerId));}
+function renderOrder(){
+ $('ingredients').replaceChildren();
+ for(const type of order){
+  const badge=document.createElement('span');badge.className='ingredient'+(collected.includes(type)?' done':'');
+  const icon=document.createElement('canvas');icon.width=68;icon.height=68;icon.setAttribute('aria-hidden','true');
+  topping(type,34,34,25,icon.getContext('2d'));
+  const label=document.createElement('span');label.textContent=(collected.includes(type)?'? ':'')+types[type].name;
+  badge.append(icon,label);$('ingredients').appendChild(badge);
+ }
+}
+function nextOrder(){const pool=[0,1,2,3,4];order=[];for(let n=0;n<3;n++){const i=Math.floor(Math.random()*pool.length);order.push(pool.splice(i,1)[0]);}collected=[];items=[];pizza.x=320;spawn=0.7;transition=0;renderOrder();}
+function end(){running=false;clearInput();saveBest();$('title').textContent='Shift complete!';$('message').textContent=`Final score: ${score}  ·  Highest score: ${best}`;$('start').textContent='Play Again';$('overlay').hidden=false;$('start').focus();}
+function catchTopping(type){
+ if(!order.includes(type)||collected.includes(type)){ruined++;$('ruined').textContent=ruined;$('status').textContent=`Wrong topping! Pizza ruined (${ruined}/3).`;items=[];if(ruined===3){end();return;}transition=1.1;return;}
+ collected.push(type);renderOrder();
+ if(collected.length===order.length){score++;$('score').textContent=score;saveBest();$('status').textContent='Order complete! +1 point. Next pizza coming up.';items=[];transition=1.1;}
+ else $('status').textContent=`${types[type].name} added! Keep following the order card.`;
+}
+$('start').addEventListener('click',()=>{score=0;ruined=0;belt=0;last=0;clearInput();$('score').textContent=0;$('ruined').textContent=0;running=true;$('overlay').hidden=true;$('status').textContent='Catch the three toppings on your order card.';nextOrder();});
+function update(dt){
+ const speed=140+Math.min(score,40)*9;belt=(belt+speed*dt)%64;
+ if(transition>0){transition-=dt;if(transition<=0)nextOrder();return;}
+ const left=keys.has('ArrowLeft')||[...pointers.values()].includes(-1),right=keys.has('ArrowRight')||[...pointers.values()].includes(1);
+ pizza.x=Math.max(65,Math.min(575,pizza.x+(Number(right)-Number(left))*420*dt));
+ spawn-=dt;
+ if(spawn<=0){const needed=order.filter(t=>!collected.includes(t));const type=Math.random()<0.65?needed[Math.floor(Math.random()*needed.length)]:Math.floor(Math.random()*types.length);items.push({x:75+Math.random()*490,y:-24,type});spawn=Math.max(0.6,1.2-score*0.02);}
+ for(let i=items.length-1;i>=0;i--){const item=items[i];item.y+=speed*dt;if(Math.hypot(item.x-pizza.x,item.y-pizza.y)<pizza.r+12){items.splice(i,1);catchTopping(item.type);if(transition>0||!running)return;}else if(item.y>550)items.splice(i,1);}
+}
+function topping(type,x,y,r=15,paint=ctx){
+ paint.save();paint.translate(x,y);paint.scale(r/18,r/18);
+ paint.lineWidth=1.6;paint.lineJoin='round';paint.lineCap='round';
+ function shape(fill,stroke,draw){paint.beginPath();draw();paint.fillStyle=fill;paint.fill();if(stroke){paint.strokeStyle=stroke;paint.stroke();}}
+ if(type===0){
+  // A pepperoni slice with a toasted edge and flecks of seasoning.
+  shape('#da5340','#8e2d23',()=>paint.arc(0,0,17,0,Math.PI*2));
+  shape('#f07852',null,()=>paint.arc(-3,-4,11,0,Math.PI*2));
+  for(const [sx,sy,size] of [[-7,-6,2.5],[5,-8,2],[7,3,3],[-5,7,2.5],[0,0,2]])shape('#ffd08a',null,()=>paint.arc(sx,sy,size,0,Math.PI*2));
+  paint.strokeStyle='#ffab73';paint.beginPath();paint.arc(0,0,13,3.5,5);paint.stroke();
+ }else if(type===1){
+  shape('#f5dfb4','#7f553d',()=>{paint.moveTo(-5,-1);paint.lineTo(-7,15);paint.quadraticCurveTo(0,19,7,15);paint.lineTo(5,-1);paint.closePath();});
+  shape('#bb8057','#67432e',()=>{paint.moveTo(-17,3);paint.bezierCurveTo(-17,-20,17,-20,17,3);paint.quadraticCurveTo(0,9,-17,3);});
+  shape('#ebbb86',null,()=>paint.ellipse(-5,-7,6,3,-0.5,0,Math.PI*2));
+  paint.strokeStyle='#8a674b';paint.beginPath();paint.moveTo(0,8);paint.lineTo(0,13);paint.stroke();
+ }else if(type===2){
+  shape('#49b867','#1e643c',()=>{paint.moveTo(-10,14);paint.bezierCurveTo(-23,-8,3,-20,14,-16);paint.bezierCurveTo(22,2,8,20,-10,14);});
+  paint.strokeStyle='#b0ef91';paint.beginPath();paint.moveTo(-11,17);paint.lineTo(10,-12);paint.moveTo(-5,8);paint.lineTo(-10,-2);paint.moveTo(0,1);paint.lineTo(10,0);paint.moveTo(4,-5);paint.lineTo(0,-11);paint.stroke();
+ }else if(type===3){
+  // An olive ring has a real transparent hole.
+  paint.beginPath();paint.ellipse(0,0,16,14,-0.3,0,Math.PI*2);paint.ellipse(0,0,7,6,-0.3,0,Math.PI*2);paint.fillStyle='#33332c';paint.fill('evenodd');paint.strokeStyle='#161e1a';paint.stroke();
+  paint.strokeStyle='#81876b';paint.lineWidth=3;paint.beginPath();paint.ellipse(0,0,12,10,-0.3,3.5,5.6);paint.stroke();
+ }else{
+  shape('#ffd747','#b57b19',()=>{paint.moveTo(-16,-8);paint.lineTo(7,-16);paint.lineTo(17,8);paint.lineTo(-6,16);paint.closePath();});
+  paint.strokeStyle='#fff3a1';paint.lineWidth=3;paint.beginPath();paint.moveTo(-11,-5);paint.lineTo(4,-10);paint.stroke();
+  paint.strokeStyle='#e8a928';paint.lineWidth=1.4;paint.beginPath();paint.moveTo(-9,3);paint.lineTo(10,-3);paint.moveTo(-5,-9);paint.lineTo(3,11);paint.moveTo(2,-12);paint.lineTo(10,9);paint.stroke();
+ }
+ paint.restore();
+}
+function draw(){
+ ctx.clearRect(0,0,640,520);ctx.fillStyle='#263438';ctx.fillRect(0,0,640,520);ctx.fillStyle='#4c5b5d';ctx.fillRect(24,0,592,520);
+ ctx.strokeStyle='#788685';ctx.lineWidth=3;for(let y=belt-64;y<520;y+=64){ctx.beginPath();ctx.moveTo(26,y);ctx.lineTo(614,y);ctx.stroke();}
+ ctx.fillStyle='#a4aba0';for(let y=12;y<520;y+=32){ctx.fillRect(5,y,12,14);ctx.fillRect(623,y,12,14);}
+ ctx.fillStyle='#ffffff14';ctx.font='bold 70px system-ui';ctx.textAlign='center';ctx.fillText('↓',320,210);
+ ctx.save();ctx.translate(pizza.x,pizza.y);ctx.shadowColor='#0007';ctx.shadowBlur=12;ctx.fillStyle='#df9e4f';ctx.beginPath();ctx.arc(0,0,pizza.r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#bd4936';ctx.beginPath();ctx.arc(0,0,35,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ffdf8c';ctx.beginPath();ctx.arc(0,0,30,0,Math.PI*2);ctx.fill();ctx.restore();
+ collected.forEach((t,i)=>{const a=i*Math.PI*2/3-Math.PI/2;topping(t,pizza.x+Math.cos(a)*18,pizza.y+Math.sin(a)*18,10);});
+ for(const item of items)topping(item.type,item.x,item.y);
+}
+function frame(time){const dt=last?Math.min((time-last)/1000,0.04):0;last=time;if(running&&!document.hidden)update(dt);draw();requestAnimationFrame(frame);}
+order=[0,1,2];renderOrder();requestAnimationFrame(frame);
+</script></body></html>

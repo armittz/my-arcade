@@ -55,10 +55,14 @@
     .controls button:active { background: #24649e; }
     .hint { font-size: 14px; margin: 14px 0; }
     .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-  </style>
+  .menu-link { display: inline-block; margin-bottom: 16px; padding: 10px 16px; border: 1px solid #91b8d0; border-radius: 10px; color: #edf8ff; background: #182e46; font: 700 16px system-ui, sans-serif; text-decoration: none; }
+.menu-link:hover { background: #2a4d6c; }
+.menu-link:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+</style>
 </head>
 <body>
   <main>
+  <a class="menu-link" href="index.html"> Menu</a>
     <header>
       <h1>✦ Star Catcher</h1>
       <div class="stats"><div><span>Caught</span><b id="caught">0</b> / 10</div><div><span>Missed</span><b id="missed">0</b> / 3</div></div>

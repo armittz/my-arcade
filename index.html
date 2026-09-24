@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Star Catcher | My Arcade</title>
+  <title>My Arcade</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -30,13 +30,46 @@
     .play { display: inline-block; padding: 20px 64px; border-radius: 16px; background: linear-gradient(135deg, #b5efff, #63baff); color: #061a38; font-size: 1.75rem; font-weight: bold; text-decoration: none; box-shadow: 0 0 28px #369fff55; }
     .play:hover { background: #dcfaff; }
     .play:focus-visible { outline: 3px solid #c5f5ff; outline-offset: 6px; }
+    .games { display: grid; gap: 20px; }
+    .games .play { padding: 24px 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 18px; }
+    .game-icon { width: 80px; height: 80px; flex: none; filter: drop-shadow(0 4px 3px #061a3833); }
+    .pizza { background: linear-gradient(135deg, #ffe7a6, #ffbd69); color: #382611; }
+    .pizza:hover { background: #fff0c6; }
   </style>
 </head>
 <body>
   <main>
-    <h1>Star Catcher</h1>
-    <p>Move your basket to catch 10 falling stars before you miss 3!</p>
-    <a class="play" href="game.html">Play</a>
+    <h1>My Arcade</h1>
+    <p>Pick a game and let the fun begin!</p>
+    <nav class="games" aria-label="Choose a game">
+      <a class="play" href="game.html">
+        <svg class="game-icon" viewBox="0 0 96 96" aria-hidden="true" focusable="false">
+          <rect x="2" y="2" width="92" height="92" rx="24" fill="#102c57"/>
+          <path d="M48 12 54 26 70 28 58 39 61 55 48 47 35 55 38 39 26 28 42 26Z" fill="#ffe08a" stroke="#fff2bc" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M24 61H72L66 83H30Z" fill="#c88648" stroke="#f5c780" stroke-width="3" stroke-linejoin="round"/>
+          <path d="M37 63 39 81M48 63V82M59 63 57 81M28 72H68" stroke="#ffe0a0" stroke-width="2"/>
+          <path d="M23 60H73" stroke="#ffe0a0" stroke-width="6" stroke-linecap="round"/>
+          <path d="M17 20V28M13 24H21M79 42V50M75 46H83" stroke="#94ddff" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="76" cy="19" r="2" fill="#e1f7ff"/>
+        </svg>
+        <span>Star Catcher</span>
+      </a>
+      <a class="play pizza" href="game2.html">
+        <svg class="game-icon" viewBox="0 0 96 96" aria-hidden="true" focusable="false">
+          <rect x="2" y="2" width="92" height="92" rx="24" fill="#70392c"/>
+          <circle cx="48" cy="48" r="35" fill="#df9e4f" stroke="#ffd49a" stroke-width="3"/>
+          <circle cx="48" cy="48" r="28" fill="#be4936"/>
+          <circle cx="48" cy="48" r="25" fill="#ffdf8c"/>
+          <g fill="#d74f3d" stroke="#a33227" stroke-width="1.5">
+            <circle cx="38" cy="34" r="7"/><circle cx="60" cy="44" r="7"/><circle cx="41" cy="61" r="7"/>
+          </g>
+          <g fill="#ffd08a"><circle cx="36" cy="32" r="1.5"/><circle cx="62" cy="43" r="1.5"/><circle cx="39" cy="60" r="1.5"/></g>
+          <path d="M48 48Q36 44 39 39Q50 38 48 48M53 65Q50 52 59 54Q64 62 53 65M55 29Q65 26 65 34Q60 38 55 29" fill="#4aab61" stroke="#267445" stroke-width="1.5"/>
+          <path d="M19 19 15 15M77 19 81 15M80 77 84 81" stroke="#ffe7a6" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        <span>Pizza Express</span>
+      </a>
+    </nav>
   </main>
 </body>
 </html>
